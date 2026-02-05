@@ -13,7 +13,7 @@ class UTGMapVisualizer:
         self.file_path = file_path
         self.logo_path = logo_path
         self.file_name = os.path.splitext(os.path.basename(file_path))[0]
-        self.output_folder = "12_Licenciaturas_PDF+PNG"
+        self.output_folder = "./11_Bachillerato_PDF+PNG"
         
         self.excel_data = None
         self.colors_map = {} 
@@ -31,7 +31,7 @@ class UTGMapVisualizer:
             hex_bg = hex_bg.lstrip('#')
             if len(hex_bg) != 6: return 'black'
             r, g, b = int(hex_bg[0:2], 16), int(hex_bg[2:4], 16), int(hex_bg[4:6], 16)
-            if (r < 50 and g < 50 and b < 50):
+            if (r < 50 or g < 50 or b < 50):
                 comp_r, comp_g, comp_b = 255 - r, 255 - g, 255 - b
                 return f'#{comp_r:02x}{comp_g:02x}{comp_b:02x}'
             return 'black'
@@ -247,33 +247,61 @@ class UTGMapVisualizer:
 
     def generate_outputs(self):
         self.load_data()
-        if not hasattr(self, 'sheets') or not self.sheets: return
+        
+        if not hasattr(self, 'sheets') or not self.sheets:
+            print("No se encontraron hojas para procesar.")
+            return
 
         os.makedirs(self.output_folder, exist_ok=True)
         pdf_path = os.path.join(self.output_folder, f"{self.file_name}.pdf")
         
         print(f"Generando salida en: {pdf_path}")
         
+        ignored_sheets = []
+        # Prefijos para mapas tipo "Main" (Cuadrícula)
+        main_prefixes = ('BT', 'LI', 'MI', 'MC', 'DC', 'SE')
+        
         with PdfPages(pdf_path) as pdf:
-            if len(self.sheets) > 0:
-                print(f"   Renderizando mapa principal...")
-                fig_main = self.render_main_map(self.sheets[0])
-                pdf.savefig(fig_main)
-                png_path = os.path.join(self.output_folder, f"{self.file_name}_Main.png")
-                fig_main.savefig(png_path, dpi=300, bbox_inches='tight')
-                plt.close(fig_main)
-            
-            for sheet in self.sheets[1:]:
-                print(f"   Renderizando especialidad: {sheet}")
-                fig_spec = self.render_specialization_map(sheet)
-                pdf.savefig(fig_spec)
+            for sheet in self.sheets:
+                sheet_clean = sheet.strip()
+                
+                # --- Lógica de nombre seguro (usada para ambos casos) ---
+                # Elimina caracteres raros para el nombre del archivo PNG
                 safe_sheet = "".join([c for c in sheet if c.isalnum() or c in (' ','-','_')]).strip()
-                png_path = os.path.join(self.output_folder, f"{self.file_name}_{safe_sheet}.png")
-                fig_spec.savefig(png_path, dpi=300, bbox_inches='tight')
-                plt.close(fig_spec)
 
+                # REGLA 1: Detectar "Main" (BT, LI, etc.)
+                if sheet_clean.startswith(main_prefixes):
+                    print(f"   [MAIN] Renderizando mapa principal: {sheet}")
+                    fig_main = self.render_main_map(sheet)
+                    pdf.savefig(fig_main)
+                    
+                    # CORRECCIÓN: Usar 'safe_sheet' en el nombre para evitar sobrescribir
+                    # Antes: f"{self.file_name}_Main.png" -> Ahora es dinámico
+                    png_path = os.path.join(self.output_folder, f"{self.file_name}_{safe_sheet}.png")
+                    
+                    fig_main.savefig(png_path, dpi=300, bbox_inches='tight')
+                    plt.close(fig_main)
+                
+                # REGLA 2: Detectar "Profundización" (Op...)
+                elif sheet_clean.startswith("Op"):
+                    print(f"   [SPEC] Renderizando especialidad: {sheet}")
+                    fig_spec = self.render_specialization_map(sheet)
+                    pdf.savefig(fig_spec)
+                    
+                    png_path = os.path.join(self.output_folder, f"{self.file_name}_{safe_sheet}.png")
+                    
+                    fig_spec.savefig(png_path, dpi=300, bbox_inches='tight')
+                    plt.close(fig_spec)
+                
+                # REGLA 3: Ignorar
+                else:
+                    ignored_sheets.append(sheet)
+
+        if ignored_sheets:
+            print(f"   [AVISO] Se ignoraron pestañas en '{self.file_name}': {ignored_sheets}")
+            
 def main():
-    carpeta_origen = "./12_Licenciaturas_BIS"
+    carpeta_origen = "./11_Bachillerato_BIS"
     lista_archivos = sys.argv[1:]
     
     if not lista_archivos:
