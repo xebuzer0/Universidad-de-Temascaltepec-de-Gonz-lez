@@ -13,7 +13,7 @@ class UTGMapVisualizer:
         self.file_path = file_path
         self.logo_path = logo_path
         self.file_name = os.path.splitext(os.path.basename(file_path))[0]
-        self.output_folder = "./11_Bachillerato_PDF+PNG"
+        self.output_folder = "./12_Licenciaturas_PDF+PNG"
         
         self.excel_data = None
         self.colors_map = {} 
@@ -190,6 +190,7 @@ class UTGMapVisualizer:
         df = self.data[sheet_name]
         rows, cols = df.shape
         
+        # Cálculo de límites dinámicos
         needed_x_limit = max(10, (cols * 2.5) + 1)
         needed_y_limit = max(10, (rows * 1.5) + 2)
         
@@ -210,17 +211,16 @@ class UTGMapVisualizer:
         for row_idx in range(rows):
             sem_label = str(df.iloc[row_idx, 0]) if cols > 0 else ""
             
-            # --- CAMBIO 2: Barras y Etiquetas en Especialidades ---
             y_center = start_y - (row_idx * 1.5)
             
-            # Dibujar franja horizontal
+            # Dibujar franja horizontal de fondo
             rect = patches.Rectangle(
                 (0, y_center - 0.75), needed_x_limit, 1.5,
                 linewidth=0, facecolor=self.stripe_colors[row_idx % 2], zorder=0
             )
             ax.add_patch(rect)
             
-            # Etiqueta de semestre a la izquierda (Columna 0)
+            # Etiqueta de semestre
             if sem_label and sem_label.lower() != 'nan':
                  ax.text(0.8, y_center, f"Sem {sem_label}", 
                     ha='center', va='center', fontsize=9, fontweight='bold', color='#555')
@@ -234,10 +234,9 @@ class UTGMapVisualizer:
                     
                     bg_color = self.colors_map.get((sheet_name, row_idx, col_idx), '#DDA0DD')
                     
-                    if col_idx > 1:
-                        prev_x = 2 + ((col_idx - 1) * 2.5)
-                        plt.plot([prev_x + (self.box_width/2), x - (self.box_width/2)], 
-                                 [y, y], color='gray', lw=1, zorder=5)
+                    # --- CAMBIO REALIZADO ---
+                    # Se eliminó el bloque 'plt.plot' que dibujaba las líneas grises
+                    # entre las materias (conectores).
                     
                     self._add_rounded_box(ax, x, y, str(cell_val), bg_color=bg_color, subtext=f"Sem {sem_label}")
 
@@ -258,27 +257,23 @@ class UTGMapVisualizer:
         print(f"Generando salida en: {pdf_path}")
         
         ignored_sheets = []
-        # Prefijos para mapas tipo "Main" (Cuadrícula)
-        main_prefixes = ('BT', 'LI', 'MI', 'MC', 'DC', 'SE')
+        
+        # --- CORRECCIÓN AQUÍ ---
+        # Agregamos 'LM' y 'LO' para que detecte LMIB y LOO como mapas principales
+        main_prefixes = ('BT', 'LI', 'MI', 'MC', 'DC', 'SE', 'LM', 'LO')
         
         with PdfPages(pdf_path) as pdf:
             for sheet in self.sheets:
                 sheet_clean = sheet.strip()
-                
-                # --- Lógica de nombre seguro (usada para ambos casos) ---
-                # Elimina caracteres raros para el nombre del archivo PNG
                 safe_sheet = "".join([c for c in sheet if c.isalnum() or c in (' ','-','_')]).strip()
 
-                # REGLA 1: Detectar "Main" (BT, LI, etc.)
+                # REGLA 1: Detectar "Main"
                 if sheet_clean.startswith(main_prefixes):
                     print(f"   [MAIN] Renderizando mapa principal: {sheet}")
                     fig_main = self.render_main_map(sheet)
                     pdf.savefig(fig_main)
                     
-                    # CORRECCIÓN: Usar 'safe_sheet' en el nombre para evitar sobrescribir
-                    # Antes: f"{self.file_name}_Main.png" -> Ahora es dinámico
                     png_path = os.path.join(self.output_folder, f"{self.file_name}_{safe_sheet}.png")
-                    
                     fig_main.savefig(png_path, dpi=300, bbox_inches='tight')
                     plt.close(fig_main)
                 
@@ -289,7 +284,6 @@ class UTGMapVisualizer:
                     pdf.savefig(fig_spec)
                     
                     png_path = os.path.join(self.output_folder, f"{self.file_name}_{safe_sheet}.png")
-                    
                     fig_spec.savefig(png_path, dpi=300, bbox_inches='tight')
                     plt.close(fig_spec)
                 
@@ -301,7 +295,7 @@ class UTGMapVisualizer:
             print(f"   [AVISO] Se ignoraron pestañas en '{self.file_name}': {ignored_sheets}")
             
 def main():
-    carpeta_origen = "./11_Bachillerato_BIS"
+    carpeta_origen = "./12_Licenciaturas_BIS"
     lista_archivos = sys.argv[1:]
     
     if not lista_archivos:

@@ -2,7 +2,7 @@
 
 main() {
     # 1. Tu directorio objetivo
-    local subdirectorio="./11_Bachillerato_BIS" 
+    local subdirectorio="./12_Licenciaturas_BIS" 
     local archivos=()
 
     # 2. Verificamos y llenamos el arreglo
